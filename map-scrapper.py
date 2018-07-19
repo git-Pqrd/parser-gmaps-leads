@@ -1,14 +1,9 @@
 import csv , argparse , urllib.request, sys  , time
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys  
 from selenium.webdriver.chrome.options import Options  
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException , StaleElementReferenceException
-
+# from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 
 
 # here iam handling the args parsing for the command line
@@ -26,9 +21,8 @@ url_tolook = '+'.join(url_tolook)
 url_tolook = 'https://www.google.com/maps/search/' + url_tolook
  
  # iam loading the driver and looking it up
-chrome_options = Options()  
-chrome_options.add_argument("--headless")  
-driver = webdriver.Chrome("chromedriver",   chrome_options=chrome_options)  
+options = Options()
+driver = webdriver.Firefox( firefox_options=options)
 driver.get(url_tolook)  
 
 
@@ -94,7 +88,6 @@ def verify_all_on_page(class_name):
     remaining = on_list % 20
     if remaining == 0 :
         remaining = 20
-    elem_to_check = driver.find_elements_by_class_name(class_name)
     if ( len(business_links)  != remaining )  :
         time.sleep(.5)
         verify_all_on_page(class_name)
@@ -128,7 +121,7 @@ def extract_info(soup):
             time.sleep(.5)
             extract_info(soup)
         else : 
-            desc = soup.find_all('div' , class_='section-editorial-quote')[0].text
+            desc_l = soup.find_all('div' , class_='section-editorial-quote')[0].text
          
         # finding all the list of cat to see if already loaded
         cat_l = soup.find_all('span' , class_='section-rating-term')

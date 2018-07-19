@@ -1,5 +1,4 @@
 beautifulsoup4==4.6.0
 lxml==4.2.1
-PyQt4==4.11.4
 selenium==3.11.0
 sip==4.19.8
