@@ -1,9 +1,10 @@
-import csv , argparse , urllib.request, sys  , time
+# import csv ,
+import argparse ,  sys  , time
 from bs4 import BeautifulSoup
+
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options  
 from selenium.common.exceptions import NoSuchElementException , StaleElementReferenceException
-# from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+from selenium.webdriver import FirefoxOptions
 
 
 # here iam handling the args parsing for the command line
@@ -18,14 +19,14 @@ output_file = str(args.o + '.csv')
 # here i am creating a string to look to for info
 url_tolook = args.p + args.b
 url_tolook = '+'.join(url_tolook)
-url_tolook = 'https://www.google.com/maps/search/' + url_tolook
+url_tolook = 'https://www.google.com/maps/search/' + url_tolook 
  
- # iam loading the driver and looking it up
-options = Options()
-driver = webdriver.Firefox( firefox_options=options)
+opts = FirefoxOptions()
+opts.add_argument("--headless")
+driver = webdriver.Firefox(firefox_options=opts)
 driver.get(url_tolook)  
 
-
+time.sleep(1)
 driver_home = driver.title
 global done
 global only_one
@@ -38,6 +39,7 @@ only_one = False
 seen = []
 seen_companies = []
 done = False
+
 # verify if the list of infos is loaded
 def verify_len( ):
     global business_links
@@ -45,6 +47,7 @@ def verify_len( ):
     global count
     global done 
     global only_one
+
     business_links = driver.find_elements_by_class_name('section-result')
     try :
         on_list = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
@@ -53,7 +56,10 @@ def verify_len( ):
         html = driver.page_source
         soup = BeautifulSoup (html , 'html.parser')
         extract_info(soup)
-        
+    except (ValueError):
+        time.sleep(1)
+        verify_len()
+        print ('not an integer but nothing ')
     remaining = on_list % 20
     if remaining == 0 :
         remaining = 20
@@ -63,7 +69,7 @@ def verify_len( ):
             sys.exit()
         if (len(business_links) != remaining ) :
             time.sleep(1)   
-
+            print ('stuck here')
             verify_len( )
         else :
             main(business_links )
@@ -74,7 +80,7 @@ def verify_one_on_page(class_name, elem_to_go):
     elem_to_check = driver.find_elements_by_class_name(class_name)
     if len(elem_to_check) != 1 :
         if home_page():
-            # print('on home')
+            print('on home')
             go_business(elem_to_go)
         time.sleep(.5)
         print('not on home can\'t find back') 
@@ -109,7 +115,13 @@ def ready_info(elem_to_go):
 def extract_info(soup):
     global only_one
     global seen_companies
-    name = soup.find_all( 'h1' , class_='section-hero-header-title')[0].text
+
+    try : 
+        name = soup.find_all( 'h1' , class_='section-hero-header-title')[0].text
+    except (IndexError):
+        time.sleep(1)
+        extract_info(soup)
+
     html = driver.page_source
     soup = BeautifulSoup( html , 'html.parser')
     if name not in seen_companies:
@@ -129,8 +141,8 @@ def extract_info(soup):
             time.sleep(.5)
             extract_info(soup)
 
-        else : 
-            category = soup.find_all('span' , class_='section-rating-term')[0].text
+        # else : 
+            # category = soup.find_all('span' , class_='section-rating-term')[0].text
 
         add_l = soup.find_all('span' , class_='maps-sprite-pane-info-address')
         web_l = soup.find_all('span' , class_='maps-sprite-pane-info-website')
@@ -139,13 +151,14 @@ def extract_info(soup):
             time.sleep(.5)
             extract_info(soup)
         else : 
-            address  = add_l[0].parent.text.encode("utf-8")
-            website = web_l[0].parent.text.encode("utf-8")
-            phone = pho_l[0].parent.text.encode("utf-8")
-            
-        with open(output_file , 'a' , newline = '') as f:
-            write_in_csv  = csv.writer(f)
-            write_in_csv.writerow([name , category , website , address , phone ])
+            address  = add_l[0].parent.text #.encode("utf-8")
+            website = web_l[0].parent.text #.encode("utf-8")
+            phone = pho_l[0].parent.text #.encode("utf-8")
+        
+        print (address + '  ' + website + '  ' + phone)
+        # with open(output_file , 'a' , newline = '') as f:
+            # write_in_csv  = csv.writer(f)
+            # write_in_csv.writerow([name , category , website , address , phone ])
     if only_one :
         sys.exit()
 
@@ -157,10 +170,14 @@ def home_page() :
 
 
 def go_back(elem_to_go):
-    
     try :
+        here = driver
         back_btn = driver.find_element_by_class_name('section-back-to-list-button')
         back_btn.send_keys('\n')
+        time.sleep(5)
+        now_here = driver
+        if here == now_here : 
+            print ('we got a probleme with the return statement ')
     except (NoSuchElementException,  StaleElementReferenceException) :
         print('not there ... trying redefine we at : ' + driver.title)
         time.sleep(1)
@@ -177,6 +194,7 @@ def go_business(elem_to_go):
         seen.append(elem_to_go) 
         try :
             elem_to_go.send_keys('\n') 
+            time.sleep(1)
         except (NoSuchElementException, StaleElementReferenceException) :
             business_links = driver.find_elements_by_class_name('section-result')
             time.sleep(1)
@@ -190,12 +208,13 @@ def next_page( ):
         page_to_go.click()
         verify_len( )
     except (NoSuchElementException,  StaleElementReferenceException) :
-        print ('wait next page available')
         time.sleep(1)
         next_page( )
-
-    before_page_num = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
-    after_page_num = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
+    try : 
+        before_page_num = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
+        after_page_num = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
+    except (ValueError) : 
+        pass 
     if before_page_num == after_page_num :
         time.sleep(2)
         if before_page_num == after_page_num  :
@@ -231,6 +250,7 @@ def main(business_links):
             done = True 
             verify_len()
         next_page()
+    
         
         
 verify_len()
