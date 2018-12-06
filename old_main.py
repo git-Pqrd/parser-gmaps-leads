@@ -1,10 +1,10 @@
-# import csv ,
+import csv 
 import argparse ,  sys  , time
 from bs4 import BeautifulSoup
-
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException , StaleElementReferenceException
+from selenium.common.exceptions import NoSuchElementException , StaleElementReferenceException, ElementClickInterceptedException
 from selenium.webdriver import FirefoxOptions
+from selenium.webdriver.common.keys import Keys
 
 
 # here iam handling the args parsing for the command line
@@ -20,29 +20,41 @@ output_file = str(args.o + '.csv')
 url_tolook = args.p + args.b
 url_tolook = '+'.join(url_tolook)
 url_tolook = 'https://www.google.com/maps/search/' + url_tolook 
+#changing because too specific 
+print("ignoring val going target with custom url")
+url_tolook = "https://www.google.com/maps/search/centre+commercial/@50.2475112,4.9225634,8.09z"
  
 opts = FirefoxOptions()
 # opts.add_argument("--headless")
-# driver = webdriver.Firefox(firefox_options=opts)
 driver = webdriver.Firefox(firefox_options=opts)
 driver.get(url_tolook)  
 
-time.sleep(1)
+time.sleep(5)
 driver_home = driver.title
 global done
 global only_one
 global count 
 count = 0
 only_one = False
-
 # difference between seen and seen companies is that seen is for troubleshooting
 # where as seen_companies is to avoid having two succursales
 seen = []
 seen_companies = []
 done = False
 
+
+#Real logic start Here
+# first operation is the verify_len()
+
+
+
 # verify if the list of infos is loaded
-def verify_len( ):
+def verify_len():
+    """
+        find the links to business pages 
+        store the number of business left
+        verify more than one vusiness concerned
+    """
     global business_links
     global on_list
     global count
@@ -53,14 +65,17 @@ def verify_len( ):
     try :
         on_list = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
     except (NoSuchElementException):
+        print("messing here")
         only_one = True
         html = driver.page_source
         soup = BeautifulSoup (html , 'html.parser')
-        extract_info(soup)
+        elem_to_go = business_links[count]
+        extract_info(soup, elem_to_go)
     except (ValueError):
         time.sleep(1)
         verify_len()
         print ('not an integer but nothing ')
+
     remaining = on_list % 20
     if remaining == 0 :
         remaining = 20
@@ -95,10 +110,8 @@ def verify_all_on_page(class_name):
     remaining = on_list % 20
     if remaining == 0 :
         remaining = 20
+
     if ( len(business_links)  != remaining )  :
-        print("\n"*5)
-        print(business_links)
-        print(len(business_links))
         print(remaining)
         time.sleep(.5)
         verify_all_on_page(class_name)
@@ -111,21 +124,20 @@ def ready_info(elem_to_go):
     soup = BeautifulSoup( html , 'html.parser')
     name = soup.find_all( 'h1' , class_='section-hero-header-title')
     if len(name) > 0:
-        extract_info(soup)
+        extract_info(soup, elem_to_go)
     else :
         time.sleep(1)
-        ready_info(elem_to_go)
+        verify_len()
 
 
-def extract_info(soup):
+def extract_info(soup, elem_to_go):
     global only_one
     global seen_companies
 
     try : 
         name = soup.find_all( 'h1' , class_='section-hero-header-title')[0].text
-    except (IndexError):
-        time.sleep(1)
-        extract_info(soup)
+    except : 
+        ready_info(elem_to_go)
 
     html = driver.page_source
     soup = BeautifulSoup( html , 'html.parser')
@@ -136,7 +148,7 @@ def extract_info(soup):
         desc_l = soup.find_all('div' , class_='section-editorial-quote')
         if len(desc_l) == 0:
             time.sleep(.5)
-            extract_info(soup)
+            extract_info(soup,elem_to_go)
         else : 
             desc_l = soup.find_all('div' , class_='section-editorial-quote')[0].text
          
@@ -144,7 +156,7 @@ def extract_info(soup):
         cat_l = soup.find_all('span' , class_='section-rating-term')
         if  len(cat_l) == 0:
             time.sleep(.5)
-            extract_info(soup)
+            extract_info(soup,elem_to_go)
 
         # else : 
             # category = soup.find_all('span' , class_='section-rating-term')[0].text
@@ -154,16 +166,18 @@ def extract_info(soup):
         pho_l = soup.find_all('span' , class_='maps-sprite-pane-info-phone')
         if  len(web_l) + len(add_l) + len(pho_l) == 0:
             time.sleep(.5)
-            extract_info(soup)
+            extract_info(soup,elem_to_go)
         else : 
             address  = add_l[0].parent.text #.encode("utf-8")
             website = web_l[0].parent.text #.encode("utf-8")
             phone = pho_l[0].parent.text #.encode("utf-8")
         
+
         print (address + '  ' + website + '  ' + phone)
-        # with open(output_file , 'a' , newline = '') as f:
-            # write_in_csv  = csv.writer(f)
-            # write_in_csv.writerow([name , category , website , address , phone ])
+        with open(output_file , 'a' , newline = '') as f:
+            write_in_csv  = csv.writer(f)
+            write_in_csv.writerow([name, website , address , phone ])
+
     if only_one :
         sys.exit()
 
@@ -175,49 +189,58 @@ def home_page() :
 
 
 def go_back(elem_to_go):
+    """ 
+        this func try to go back when we are in a business pageù
+        if it does not find the go back button i assume it is because not there yet
+        or we already at home page
+    """
     try :
-        here = driver
         back_btn = driver.find_element_by_class_name('section-back-to-list-button')
         back_btn.click()
         time.sleep(5)
-        now_here = driver
-        if here == now_here : 
-         go_back(elem_to_go)
-    except (NoSuchElementException,  StaleElementReferenceException) :
-        print('not there ... trying redefine we at : ' + driver.title)
-        if not home_page():
-            time.sleep(1)
+    except NoSuchElementException : 
+        if home_page() : 
+            print('home_page ?')
+        else : 
+            time.sleep(5)
+            print("debug")
             go_back(elem_to_go)
-        else :
-            go_business(elem_to_go)
 
 
 def go_business(elem_to_go):
     global seen
     global business_links
     global count
-    if elem_to_go in  seen:
-        main (business_links )
-    else : 
-        seen.append(elem_to_go) 
-        try :
-            elem_to_go.click() 
-            time.sleep(1)
-        except (NoSuchElementException, StaleElementReferenceException) :
-            business_links = driver.find_elements_by_class_name('section-result')
-            time.sleep(1)
-            main(business_links )
-
+    seen.append(elem_to_go) 
+    try :
+        time.sleep(.9)
+        elem_to_go.click() 
+        time.sleep(.5)
+    except (NoSuchElementException,  StaleElementReferenceException) :
+        business_links = driver.find_elements_by_class_name('section-result')
+        time.sleep(1)
+        main(business_links)
+    except AttributeError : 
+        pass
 
 def next_page( ):
     global count
+    print("end of page")
     try :
+        print(driver.title)
         page_to_go = driver.find_element_by_class_name('section-pagination-button-next')
-        page_to_go.click()
-        verify_len( )
+        time.sleep(0.5)
+        page_to_go.send_keys(Keys.RETURN)
+        time.sleep(1)
+        verify_len()
     except (NoSuchElementException,  StaleElementReferenceException) :
         time.sleep(1)
-        next_page( )
+        next_page()
+    except(ElementClickInterceptedException):
+        time.sleep(0.5)
+        next_page()
+
+
     try : 
         before_page_num = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
         after_page_num = int(driver.find_element_by_xpath("//div[@class='section-pagination-right']/span/span[last()]").text)
@@ -237,12 +260,16 @@ def main(business_links):
     # wating and doing op to load all the info taking the html and clearing the driver   
     out_of_range = False
 
+    print("here")
     while out_of_range == False :
         try :
             elem_to_go = business_links[count]
+            print("the elem_to_go is" +  str(elem_to_go))
             out_of_range = True
         except IndexError : 
             time.sleep(3)
+            print("here but leaving")
+    print("here")
   
 
     go_business(elem_to_go)
@@ -250,7 +277,6 @@ def main(business_links):
     verify_one_on_page('section-back-to-list-button' , elem_to_go)
     go_back(elem_to_go)
     count = count + 1
-    print ('--loop nmbr :' + str(count) + ' out of ' + str(len(business_links)) )
     if count ==  len(business_links) :
         count = 0
         if (on_list % 20) != 0 :
