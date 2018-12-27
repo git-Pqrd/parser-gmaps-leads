@@ -16,18 +16,12 @@ parser.add_argument('-o', type=str , help='output file name without .csv at the 
 parser.add_argument('-p', type=str , default='' ,  nargs='+' , help='location to look')
 parser.add_argument('-b', type=str , default='' , nargs='+' , help='business to search')
 parser.add_argument('-u', type=str , default='' , nargs='+' , help='business to search')
-parser.add_argument('-n', type=str , default='' , nargs='+' , help='pagination to next')
 args = parser.parse_args()
 url_tolook = args.p + args.b
 url_tolook = '+'.join(url_tolook)
 url_tolook = 'https://www.google.com/maps/search/' + "+".join(args.p) + "+" +  "+".join(args.b)
 if (args.u) :
     url_tolook = args.u[0]
-
-if (args.n) :
-    n = int(args.n[0])
-else :
-    n = 0
 
 output_file = str(args.o + '.csv')
 web_seen = []
@@ -57,12 +51,13 @@ def extract_info(soup):
     except :
         return
 
-    if not "." in website :
-        return
+    #getting ride of this part as i am looking for people with no website
+    # if not "." in website :
+        # return
 
-    if website in web_seen :
-        return
-    web_seen.append(website)
+    # if website in web_seen :
+        # return
+    # web_seen.append(website)
 
     print (address + '  ' + website + '  ' + phone)
     with open(output_file , 'a' , newline = '') as f:
@@ -71,7 +66,8 @@ def extract_info(soup):
 
 def click_and_go(link):
     time.sleep(1)
-    try : link.click()
+    try :
+        link.click()
     except ElementNotInteractableException :
         time.sleep(3)
         link.click()
@@ -86,49 +82,47 @@ def click_and_go(link):
     soup = BeautifulSoup (html , 'html.parser')
     extract_info(soup)
     #time.sleep(2)software work even I do not wait just no risk ban
-    try : back_btn = driver.find_elements_by_class_name("section-back-to-list-button.blue-link.noprint")[0]
+    try :
+        back_btn = driver.find_elements_by_class_name("section-back-to-list-button.blue-link.noprint")[0]
     except :
         time.sleep(1)
         back_btn = driver.find_elements_by_class_name("section-back-to-list-button.blue-link.noprint")[0]
     back_btn.click()
-    WebDriverWait(driver, 10 ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.section-result-details-container")))
-
-
-def next_page():
-    time.sleep(2)
-    try: next_btn = driver.find_elements(By.XPATH,"//*[contains(@id,'section-pagination-button-next')]")[0]
-    except : next_btn = driver.find_element(By.XPATH,"//*[contains(@id,'section-pagination-button-next')]")
-    try :
-        next_btn.click()
-        print("changing page")
-    except ElementClickInterceptedException : next_page()
-    except NoSuchElementException as e :
-        print("over")
-        driver.close()
-        raise e
-
+    WebDriverWait(driver, 10 ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.section-result-details-container")))#the  is ok shit can be startedAAA
 
 while True :
-    try : driver.find_elements(By.XPATH,'//*[@id="consent-bump"]/div/div[2]/span/button[1]')[0].click()
-    except : pass
-
-    for i in range(n) : next_page()
-    n = 0
-
     business_links = driver.find_elements_by_class_name('section-result')
     for i in range(len(business_links)):
         freshBL = driver.find_elements_by_class_name('section-result')
-        try : click_and_go(freshBL[i])
-        except : continue
+        try :
+            click_and_go(freshBL[i])
+        except :
+            continue
+    
 
+    try:
+        next_btn = driver.find_elements(By.XPATH,"//*[contains(@id,'section-pagination-button-next')]")[0]
+    except :
+        next_btn = driver.find_element(By.XPATH,"//*[contains(@id,'section-pagination-button-next')]")
 
     try :
-        number_left = int(driver.find_element(By.XPATH,"//*[@id='pane']/div/div[1]/div/div/div[4]/div/div[2]/span/span[2]").text)
-        if number_left % 20 != 0 : break
-    except : pass
+        time.sleep(1)
+        next_btn.click()
+        print("changing page")
+    except ElementClickInterceptedException :
+        try :
+            driver.find_elements(By.XPATH,'//*[@id="consent-bump"]/div/div[2]/span/button[1]')[0].click()
+        except :
+            pass
+    except NoSuchElementException :
+        print("Done")
+        break
 
-    next_page()
-
-
+    try:
+        if not (driver.find_elements(By.XPATH,'//*[@id="pane"]/div/div[1]/div/div/div[3]/div/div[2]/span/span[2]')[0].text % 20 == 0):
+            print("Done")
+            break
+    except :
+        pass
 
 driver.close()
