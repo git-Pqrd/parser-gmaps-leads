@@ -2,7 +2,7 @@
 ## first step before the hunter.io email auto 
 
 ## running
-![](gmaps.parser.gif)
+![](gmaps-parser.gif)
 
 ## screenshot 
 ![](gmaps-parser-1.png)
