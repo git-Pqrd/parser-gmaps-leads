@@ -113,12 +113,12 @@ def click_and_go(link):
     soup = BeautifulSoup (html , 'html.parser')
     extract_info(soup)
     #time.sleep(2)software work even I do not wait just no risk ban
-    try : back_btn = driver.find_elements_by_class_name("section-back-to-list-button")[0]
-    except :
-        time.sleep(1)
+    try : 
         back_btn = driver.find_elements_by_class_name("section-back-to-list-button")[0]
+        back_btn.click()
+    except :
+        pass
         
-    back_btn.click()
     WebDriverWait(driver, 10 ).until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.section-result-details-container")))
 
 
@@ -130,7 +130,7 @@ def next_page():
     except : next_btn = driver.find_element(By.XPATH,"//*[contains(@id,'section-pagination-button-next')]")
     try :
         next_btn.click()
-        print("changing page")
+        print("-------------------changing page--------------------------")
     except ElementClickInterceptedException : next_page()
     except NoSuchElementException as e :
         print("over")
